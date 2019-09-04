@@ -1,0 +1,231 @@
+using UnityEngine;
+using UnityEngine.XR.MagicLeap;
+
+
+public class GesturesControl : MonoBehaviour
+{
+    public GameObject Camera;
+    public GameObject Sau, Ebox, Battery, MidSection, Pylons;
+    public GameObject SauInfoBox, EBoxInfoBox, BatteryInfoBox;
+    public GameObject CSau, CBattery, CEbox;
+    public GameObject MMidSection, MPylons;
+    
+    
+    // public Transform target;
+
+
+    public enum HandPoses { FingerR, LR, PinchR, FistR, Nopose, FingerL, LL, PinchL, FistL };
+    public HandPoses poseR = HandPoses.Nopose;
+    public HandPoses poseL = HandPoses.Nopose;
+
+    bool IsFocus = false;
+    bool IsFinger = false;
+    float GestureChange = 1.5f;
+
+    RaycastHit rayHit;
+    int layerMask = 1 << 11;
+
+    private Vector3 _headingR, _headingL;
+    //private Vector3 _heading;
+    private MLHandKeyPose[] _gestures;
+
+
+
+
+
+    private void Awake()
+    {
+        MLHands.Start();
+        _gestures = new MLHandKeyPose[4];
+        _gestures[0] = MLHandKeyPose.Finger;
+        _gestures[1] = MLHandKeyPose.L;
+        _gestures[2] = MLHandKeyPose.Pinch;
+        _gestures[3] = MLHandKeyPose.Fist;
+        MLHands.KeyPoseManager.EnableKeyPoses(_gestures, true, false);
+
+
+    }
+
+    private void OnDestroy()
+    {
+        MLHands.Stop();
+    }
+
+    void Start()
+    {
+    }
+
+    void Update()
+    {
+        #region Assign Gestures
+        //assign Hand poses from lib
+        if (GetGesture(MLHands.Left, MLHandKeyPose.Finger))
+        {
+            poseL = HandPoses.FingerL;
+        }
+        else if (GetGesture(MLHands.Left, MLHandKeyPose.L))
+        {
+            poseL = HandPoses.LL;
+        }
+        else if (GetGesture(MLHands.Left, MLHandKeyPose.Pinch))
+        {
+            poseL = HandPoses.PinchL;
+        }
+        else if (GetGesture(MLHands.Left, MLHandKeyPose.Fist))
+        {
+            poseL = HandPoses.FistL;
+        }
+        else
+        {
+            poseL = HandPoses.Nopose;
+        }
+
+
+        if (GetGesture(MLHands.Right, MLHandKeyPose.Finger))
+        {
+            poseR = HandPoses.FingerR;
+        }
+        else if (GetGesture(MLHands.Right, MLHandKeyPose.L))
+        {
+            poseR = HandPoses.LR;
+        }
+        else if (GetGesture(MLHands.Right, MLHandKeyPose.Pinch))
+        {
+            poseR = HandPoses.PinchR;
+        }
+        else if (GetGesture(MLHands.Right, MLHandKeyPose.Fist))
+        {
+            poseR = HandPoses.FistR;
+        }
+        else
+        {
+            poseR = HandPoses.Nopose;
+        }
+        #endregion
+        _headingR = MLHands.Right.Index.KeyPoints[0].Position - Camera.transform.position;
+        _headingL = MLHands.Left.Index.KeyPoints[0].Position - Camera.transform.position;
+
+      
+
+
+        GestureChange -= Time.deltaTime;
+
+
+        #region Controls the functions for Hand Gestures
+        if (poseL == HandPoses.FingerL || poseR == HandPoses.FingerR)
+        {
+
+            //Debug.DrawRay(Camera.transform.position, _headingR, Color.green);
+            // Debug.DrawRay(Camera.transform.position, _headingL, Color.green);
+
+            IsFinger = true;
+            if (poseR == HandPoses.FingerR)
+            {
+                RayCastDetectionR();
+            }
+
+            if (poseL == HandPoses.FingerL)
+            {
+                RayCastDetectionL();
+            }
+        }
+        else if ( poseL != HandPoses.FingerL || poseR != HandPoses.FingerR)
+        {
+            MidSection.GetComponent<Outline>().enabled = false;
+        }
+
+
+        if ( IsFinger == true && IsFocus == true && GestureChange > 0.0f && poseR == HandPoses.LR || IsFinger == true && IsFocus == true && GestureChange > 0.0f && poseL == HandPoses.LL)
+         {
+            if (MMidSection.GetComponent<MeshRenderer>().enabled == true)
+            {
+                layerMask = 1 << 11;
+                //layerMask = ~layerMask;
+                Debug.Log("First Layer Active");
+                MMidSection.GetComponent<MeshRenderer>().enabled = false;
+            } 
+         }
+
+
+        if (IsFinger == true && IsFocus == true && GestureChange > 0.0f && poseR == HandPoses.FistR || IsFinger == true && IsFocus == true && GestureChange > 0.0f && poseL == HandPoses.FistL)
+        {
+            if (MMidSection.GetComponent<MeshRenderer>().enabled == false)
+            {
+                layerMask = 1 << 11;
+                //layerMask = ~layerMask;
+                Debug.Log("Second Layer Active");
+                MMidSection.GetComponent<MeshRenderer>().enabled = true;
+            }
+        }
+        #endregion
+
+
+      
+
+
+
+
+        void RayCastDetectionR()
+        {
+            if (Physics.Raycast(Camera.transform.position, _headingR, out rayHit, layerMask))
+            {
+                if (rayHit.collider.CompareTag("Mid"))
+                {
+                    Debug.Log("Mid Hit");
+                    IsFocus = true;
+                    MidSection.GetComponent<Outline>().enabled = true;
+
+                }
+
+            }
+        }
+
+        void RayCastDetectionL()
+        {
+            if ( Physics.Raycast(Camera.transform.position, _headingL, out rayHit, layerMask))
+            {
+                if (rayHit.collider.CompareTag("Mid"))
+                {
+                    Debug.Log("Mid Hit");
+                    IsFocus = true;
+                    MidSection.GetComponent<Outline>().enabled = true;
+
+                }
+
+            }
+        }
+
+
+        #region Timer Functions
+
+        if (GestureChange <= 0.0f)
+        {
+            timerEnded();
+        }
+
+        void timerEnded()
+        {
+            Debug.Log("time Reset");
+            IsFinger = false;
+            IsFocus = false;
+            GestureChange = 1.5f;
+        }
+        #endregion
+
+        bool GetGesture(MLHand hand, MLHandKeyPose type)
+        {
+            if (hand != null)
+            {
+                if (hand.KeyPose == type)
+                {
+                    if (hand.KeyPoseConfidence > .9f)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+    }
+}
